@@ -29,35 +29,43 @@ static Sprite minivan;
 #define NUMBER_OF_TILES 16
 rafgl_raster_t tiles[NUMBER_OF_TILES];
 
-#define WORLD_SIZE_W 13
-#define WORLD_SIZE_H 13
-int tile_world[WORLD_SIZE_W][WORLD_SIZE_H];
+#define WORLD_SIZE 13
+int tile_world[WORLD_SIZE][WORLD_SIZE];
 
 #define TILE_SIZE 64
 
 static int raster_width = RASTER_WIDTH, raster_height = RASTER_HEIGHT;
-int cam_x = (1 + WORLD_SIZE_W / 2) * TILE_SIZE, cam_y = WORLD_SIZE_H * TILE_SIZE;
+int cam_x = (1 + WORLD_SIZE / 2) * TILE_SIZE, cam_y = WORLD_SIZE * TILE_SIZE;
 
 int selected_x, selected_y;
 
 void tilemap_init(void)
 {
-    for (int y = 0; y < WORLD_SIZE_H; y++) {
-        for (int x = 0; x < WORLD_SIZE_W; x++) {
+    for (int y = 0; y < WORLD_SIZE; y++) {
+        for (int x = 0; x < WORLD_SIZE; x++) {
             if (y == 0 || y == 6 || y == 12) {
                 tile_world[y][x] = 0;
             } else if (y > 0 && y < 6) {
-                if (x == 3) {
+                if (x == 3 || ((y == 1 || y == 2) && (x == WORLD_SIZE - 2))) {
                     tile_world[y][x] = 2;
                 } else {
-                    tile_world[y][x] = 1;
+                    if(randf() + 1 < 0.35f) {
+                        tile_world[y][x] = 3;
+                    } else {
+                        tile_world[y][x] = 1;
+                    }
+                    if ((y == 1 && x == 7) || (y == 4 && x == 6) 
+                    || (y == 3 && x == 12) || (y == 5 && x == 10)) {
+                        tile_world[y][x] = 5;
+                        tile_world[y][x - 1] = 4;
+                    }
                 }
             } else if (y == 7) {
-                tile_world[y][x] = 6;
+                tile_world[y][x] = 8;
             } else if (y > 7 && y < 11) {
-                tile_world[y][x] = 5;
+                tile_world[y][x] = 7;
             } else if (y == 11) {
-                tile_world[y][x] = 4;
+                tile_world[y][x] = 6;
             }
         }
     }
@@ -76,10 +84,10 @@ void tilemap_render(rafgl_raster_t *raster)
     if (x1 < 0) x1 = 0;
     if (y1 < 0) y1 = 0;
 
-    if (x0 >= WORLD_SIZE_W) x0 = WORLD_SIZE_W - 1;
-    if (y0 >= WORLD_SIZE_H) y0 = WORLD_SIZE_H - 1;
-    if (x1 >= WORLD_SIZE_W) x1 = WORLD_SIZE_W - 1;
-    if (y1 >= WORLD_SIZE_H) y1 = WORLD_SIZE_H - 1;
+    if (x0 >= WORLD_SIZE) x0 = WORLD_SIZE - 1;
+    if (y0 >= WORLD_SIZE) y0 = WORLD_SIZE - 1;
+    if (x1 >= WORLD_SIZE) x1 = WORLD_SIZE - 1;
+    if (y1 >= WORLD_SIZE) y1 = WORLD_SIZE - 1;
 
     rafgl_raster_t *draw_tile;
 
@@ -96,8 +104,8 @@ void tilemap_render(rafgl_raster_t *raster)
 
 void main_state_reset()
 {
-    cam_x = (1 + WORLD_SIZE_W / 2) * TILE_SIZE;
-    cam_y = WORLD_SIZE_H * TILE_SIZE;
+    cam_x = (1 + WORLD_SIZE / 2) * TILE_SIZE;
+    cam_y = WORLD_SIZE * TILE_SIZE;
 
     cam_x -= raster_width / 2 + 32;
     cam_y -= raster_height / 2 + 96;
@@ -148,9 +156,11 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height)
     rafgl_spritesheet_init(&truck, "res/images/truck.png", 1, 1);
     rafgl_spritesheet_init(&minivan, "res/images/minivan.png", 1, 1);
 
+    // INITIAL CAMERA POSITION
     cam_x -= raster_width / 2 + 32;
     cam_y -= raster_height / 2 + 96;
 
+    // INITIAL SPRITE POSITIONS
     character.pos_x = raster_width / 2 - 32;
     character.pos_y = raster_height / 2 + 32;
     character.init_pos_x = character.pos_x;
@@ -179,7 +189,6 @@ float selector = 0;
 int animation_running = 0;
 int direction = 0;
 
-int hero_speed = 150;
 int hover_frames = 0;
 int jump_interval = 10;
 
@@ -196,9 +205,19 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
         pressed = 0;
     }
 
-    selected_x = rafgl_clampi((game_data->mouse_pos_x + cam_x) / TILE_SIZE, 0, WORLD_SIZE_W - 1);
-    selected_y = rafgl_clampi((game_data->mouse_pos_y + cam_y) / TILE_SIZE, 0, WORLD_SIZE_H - 1);
+    selected_x = rafgl_clampi((game_data->mouse_pos_x + cam_x) / TILE_SIZE, 0, WORLD_SIZE - 1);
+    selected_y = rafgl_clampi((game_data->mouse_pos_y + cam_y) / TILE_SIZE, 0, WORLD_SIZE - 1);
 
+    // MAIN STATE RESET
+    if (((character.pos_x > truck.pos_x - 64 && character.pos_x < truck.pos_x + 128) && (character.pos_y < truck.pos_y + 5 && character.pos_y > truck.pos_y - 5)) ||
+        ((character.pos_x > minivan.pos_x - 64 && character.pos_x < minivan.pos_x + 128) && (character.pos_y < minivan.pos_y + 5 && character.pos_y > minivan.pos_y - 5)) ||
+        (tile_world[(character.pos_y + cam_y) / TILE_SIZE][(character.pos_x + cam_x) / TILE_SIZE] == 1) ||
+        (tile_world[(character.pos_y + cam_y) / TILE_SIZE][(character.pos_x + cam_x) / TILE_SIZE] == 5)) {
+        //printf("(%d, %d), (%d, %d)\n", character.pos_x, character.pos_y, truck.pos_x, truck.pos_y);
+        main_state_reset();
+    }
+
+    // RANDOMISED VEHICLE TIMING
     if (rand_num == rand_cnt) {
         // TODO
         rand_cnt = 300;
@@ -206,61 +225,59 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
         rand_cnt--;
     }
 
+    // VEHICLE MOVEMENT
     truck.pos_x -= 3;
-    if (truck.pos_x <= truck.init_pos_x + 128 - TILE_SIZE * WORLD_SIZE_W) {
+    if (truck.pos_x <= truck.init_pos_x + 128 - TILE_SIZE * WORLD_SIZE) {
         truck.pos_x = truck.init_pos_x;
     }
 
     minivan.pos_x += 5;
-    if (minivan.pos_x >= minivan.init_pos_x - 192 + TILE_SIZE * WORLD_SIZE_W) {
+    if (minivan.pos_x >= minivan.init_pos_x - 160 + TILE_SIZE * WORLD_SIZE) {
         minivan.pos_x = minivan.init_pos_x;
     }
 
-    if (((character.pos_x > truck.pos_x - 64 && character.pos_x < truck.pos_x + 128) && (character.pos_y < truck.pos_y + 5 && character.pos_y > truck.pos_y - 5)) ||
-        ((character.pos_x > minivan.pos_x - 64 && character.pos_x < minivan.pos_x + 128) && (character.pos_y < minivan.pos_y + 5 && character.pos_y > minivan.pos_y - 5)) ||
-        (tile_world[(character.pos_y + cam_y) / TILE_SIZE][(character.pos_x + cam_x) / TILE_SIZE] == 1)) {
-        //printf("(%d, %d), (%d, %d)\n", character.pos_x, character.pos_y, truck.pos_x, truck.pos_y);
-        main_state_reset();
-    }
-
+    // CHARACTER MOVEMENT
     animation_running = 1;
-
     jump_interval--;
-    if (game_data->keys_pressed[RAFGL_KEY_S]) {
+    if (game_data->keys_pressed[RAFGL_KEY_S] || game_data->keys_pressed[RAFGL_KEY_DOWN]) {
         if (jump_interval < 0 && cam_y < raster_height / 2) {
             cam_y += 64;
-            truck.pos_y -= 64;
-            minivan.pos_y -= 64;
             jump_interval = 15;
             direction = 0;
+
+            truck.pos_y -= 64;
+            minivan.pos_y -= 64;
         }
-    } else if (game_data->keys_pressed[RAFGL_KEY_A]) {
+    } else if (game_data->keys_pressed[RAFGL_KEY_A] || game_data->keys_pressed[RAFGL_KEY_LEFT]) {
         if (jump_interval < 0 && cam_x >= -576) {
             cam_x -= 64;
+            jump_interval = 15;
+            direction = 1;
+
             truck.init_pos_x += 64;
             truck.pos_x += 64;
             minivan.init_pos_x += 64;
             minivan.pos_x += 64;
-            jump_interval = 15;
-            direction = 1;
         }
-    } else if (game_data->keys_pressed[RAFGL_KEY_W]) {
+    } else if (game_data->keys_pressed[RAFGL_KEY_W] || game_data->keys_pressed[RAFGL_KEY_UP]) {
         if (jump_interval < 0 && cam_y >= -352) {
             cam_y -= 64;
-            truck.pos_y += 64;
-            minivan.pos_y += 64;
             jump_interval = 15;
             direction = 2;
+
+            truck.pos_y += 64;
+            minivan.pos_y += 64;
         }
-    } else if (game_data->keys_pressed[RAFGL_KEY_D]) {
+    } else if (game_data->keys_pressed[RAFGL_KEY_D] || game_data->keys_pressed[RAFGL_KEY_RIGHT]) {
         if (jump_interval < 0 && cam_x < raster_width / 8) {
             cam_x += 64;
+            jump_interval = 15;
+            direction = 3;
+
             truck.init_pos_x -= 64;
             truck.pos_x -= 64;
             minivan.init_pos_x -= 64;
             minivan.pos_x -= 64;
-            jump_interval = 15;
-            direction = 3;
         }
     } else {
         animation_running = 0;
