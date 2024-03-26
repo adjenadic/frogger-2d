@@ -1,6 +1,6 @@
 # Frogger 2D
 ## Summary
-A simplified 2D Frogger demo crafted in C using a modified version of OpenGL for a computer graphics project. The goal is to navigate the frog through obstacles to reach the lily pad on the river, serving as a showcase for graphics capabilities.
+A simplified 2D Frogger demo made in C using a modified version of OpenGL for a computer graphics course. It mainly serves to showcase graphics capabilities available with the bundled libraries. The in-game goal is to navigate the frog through obstacles to reach the lily pad on the river.
 
 ## Controls
 | Button      | Action       |
